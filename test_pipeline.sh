@@ -199,9 +199,13 @@ run_pipeline() {
         print_status "Step 4: Testing detailed metadata retrieval"
         metadata_cmd="./datasets summary genome accession --inputfile $cross_ref_file --as-json-lines | ./dataformat tsv genome --fields $TSV_FIELDS"
         
-        if test_command "Metadata retrieval" "$metadata_cmd" "filtered_assemblies.tsv"; then
+        if test_command "Metadata retrieval" "$metadata_cmd" "temp_metadata.tsv"; then
+            # Deduplicate based on assembly accession (field 3)
+            print_status "Deduplicating results based on assembly accession..."
+            awk -F'\t' '!seen[$3]++' temp_metadata.tsv > filtered_assemblies.tsv
+            
             local metadata_count=$(wc -l < filtered_assemblies.tsv)
-            print_success "Metadata retrieval completed successfully ($metadata_count assemblies)"
+            print_success "Metadata retrieval and deduplication completed successfully ($metadata_count unique assemblies)"
             
             print_status "Metadata sample (first 3 lines):"
             head -3 filtered_assemblies.tsv
@@ -251,7 +255,7 @@ run_pipeline() {
 # Function to cleanup test files
 cleanup() {
     print_status "Cleaning up test files..."
-    rm -f "$new_assemblies" filtered_assemblies.tsv eukaryote_accessions.txt project_accessions.txt "$cross_ref_file"
+    rm -f "$new_assemblies" filtered_assemblies.tsv temp_metadata.tsv eukaryote_accessions.txt project_accessions.txt "$cross_ref_file"
     print_success "Cleanup completed"
 }
 

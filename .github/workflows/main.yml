@@ -50,7 +50,14 @@ jobs:
           
           # Step 4: Get detailed metadata for cross-referenced accessions
           echo "Step 4: Retrieving detailed metadata for cross-referenced accessions"
-          ./datasets summary genome accession --inputfile "$cross_ref_file" --as-json-lines | ./dataformat tsv genome --fields ${{env.TSV_FIELDS}} > "$matrix_path"
+          ./datasets summary genome accession --inputfile "$cross_ref_file" --as-json-lines | ./dataformat tsv genome --fields ${{env.TSV_FIELDS}} > temp_metadata.tsv
+          
+          # Step 5: Deduplicate based on assembly accession (first field)
+          echo "Step 5: Deduplicating results based on assembly accession"
+          awk -F'\t' '!seen[$3]++' temp_metadata.tsv > "$matrix_path"
+          
+          # Cleanup temporary files
+          rm -f eukaryote_accessions.txt project_accessions.txt "$cross_ref_file" temp_metadata.tsv
 
           # Cleanup temporary files
           rm -f eukaryote_accessions.txt project_accessions.txt "$cross_ref_file"
