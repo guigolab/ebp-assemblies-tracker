@@ -1,0 +1,62 @@
+name: CI
+
+# Controls when the workflow will run
+on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron:  '0 0 * * *'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        
+      - name: Environment Variables from Dotenv
+        uses: c-py/action-dotenv-to-setenv@v4
+      
+      - name: Install required NCBI packages
+        run: |
+          #retrieve packages and set permissions
+          curl -O 'https://ftp.ncbi.nlm.nih.gov/pub/datasets/command-line/v2/linux-amd64/dataformat'
+          curl -O 'https://ftp.ncbi.nlm.nih.gov/pub/datasets/command-line/v2/linux-amd64/datasets'
+          chmod +x datasets dataformat
+          
+      - name: Run query and get new rows
+        run: |
+          new_assemblies="output.tsv"
+          cross_ref_file="cross_referenced_accessions.txt"
+          matrix_path="${{env.MATRIX_PATH}}"
+          
+          # Step 1: Get eukaryote taxon accessions (taxon ID 2759)
+          echo "Step 1: Retrieving eukaryote taxon accessions"
+          ./datasets summary genome taxon ${{env.ROOT_TAXON}} --report ids_only --as-json-lines | ./dataformat tsv genome --fields accession --elide-header > eukaryote_accessions.txt
+          
+          # Step 2: Get project accession list ("{{env.PROJECT_ACCESSION}}")
+          echo "Step 2: Retrieving project accessions"
+          ./datasets summary genome accession ${{env.PROJECT_ACCESSION}} --report ids_only --as-json-lines | ./dataformat tsv genome --fields accession --elide-header > project_accessions.txt
+          
+          # Step 3: Cross-reference the two lists to find common accessions
+          echo "Step 3: Cross-referencing accessions"
+          comm -12 <(sort eukaryote_accessions.txt) <(sort project_accessions.txt) > "$cross_ref_file"
+          
+          # Step 4: Get detailed metadata for cross-referenced accessions
+          echo "Step 4: Retrieving detailed metadata for cross-referenced accessions"
+          ./datasets summary genome accession --input-file "$cross_ref_file" --as-json-lines | ./dataformat tsv genome --fields ${{env.TSV_FIELDS}} > "$matrix_path"
+
+          # Cleanup temporary files
+          rm -f "$new_assemblies" eukaryote_accessions.txt project_accessions.txt "$cross_ref_file"
+          
+      - name: Commit & Push changes
+        uses: actions-js/push@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
