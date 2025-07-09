@@ -2,6 +2,10 @@
 
 A GitHub Actions workflow that automatically tracks genome assemblies by cross-referencing eukaryote taxon data with the Earth BioGenome Project (EBP).
 
+## Observable Notebook
+
+See the TSV file as a data table [here](https://observablehq.com/d/0d1aaf560f6380d7)
+
 ## 🎯 Purpose
 
 This repository contains an automated pipeline that:
